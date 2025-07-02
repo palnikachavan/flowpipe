@@ -1,0 +1,37 @@
+{
+  "nodes": [
+    {
+      "id": "input1"
+    },
+    {
+      "id": "input2"
+    },
+    {
+      "id": "sum"
+    },
+    {
+      "id": "double_sum"
+    },
+    {
+      "id": "square_sum"
+    }
+  ],
+  "links": [
+    {
+      "source": "input1",
+      "target": "sum"
+    },
+    {
+      "source": "input2",
+      "target": "sum"
+    },
+    {
+      "source": "sum",
+      "target": "double_sum"
+    },
+    {
+      "source": "sum",
+      "target": "square_sum"
+    }
+  ]
+}

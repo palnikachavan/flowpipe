@@ -1,6 +1,6 @@
 from flowpipe.pipeline import PipeLine
 from flowpipe.executor import Executor
-from flowpipe.visualizer import visualize_pipeline
+from flowpipe.visualizer import visualize_pipeline, export_PipeLine_as_JSON
 import time
 
 # Step functions
@@ -65,3 +65,5 @@ print(f"Time taken (threaded): {end_threaded - start_threaded:.2f} seconds")
 
 # visualize using networkx and matplotlib
 visualize_pipeline(pipe, output_file="example1_dag.png", engine="networkx", view=True)
+
+export_PipeLine_as_JSON(pipe, output_file="example_dag.json")

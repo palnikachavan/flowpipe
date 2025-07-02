@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Flowpipe DAG Viewer (d3-dag)</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-dag@0.7"></script>
+    <style>
+        svg {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ccc;
+            background: #fdfdfd;
+        }
+
+        .node rect {
+            fill: lightblue;
+            stroke: #333;
+            rx: 5;
+        }
+
+        .link {
+            stroke: #888;
+            stroke-width: 2px;
+            fill: none;
+        }
+
+        button {
+            margin: 10px;
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Flowpipe DAG Viewer (d3-dag)</h2>
+    <button onclick="downloadSVG()">Download as SVG</button>
+    <svg></svg>
+
+    <script>
+        fetch("example_dag.json")
+            .then(res => res.json())
+            .then(data => {
+                const { nodes, links } = data;
+
+                const childToParents = {};
+                nodes.forEach(n => childToParents[n.id] = []);
+                links.forEach(link => {
+                    if (!childToParents[link.target]) {
+                        childToParents[link.target] = [];
+                    }
+                    childToParents[link.target].push(link.source);
+                });
+
+                const stratifyData = Object.entries(childToParents).map(([id, parentIds]) => ({ id, parentIds }));
+                const dag = d3.dagStratify()(stratifyData);
+                const layout = d3.sugiyama();
+                layout(dag);
+
+                const svg = d3.select("svg");
+                const g = svg.append("g");
+
+                // Enable zoom and pan
+                svg.call(d3.zoom().on("zoom", (event) => {
+                    g.attr("transform", event.transform);
+                }));
+
+                // Position map for updates
+                const pos = new Map();
+
+                // Initial positions
+                dag.descendants().forEach(d => {
+                    pos.set(d.data.id, { x: d.x * 150, y: d.y * 150 });
+                });
+
+                // Draw links
+                const linkLines = g.selectAll("line.link")
+                    .data(dag.links())
+                    .enter()
+                    .append("line")
+                    .attr("class", "link")
+                    .attr("stroke", "#888")
+                    .attr("stroke-width", 2);
+
+                // Draw nodes
+                const node = g.selectAll("g.node")
+                    .data(dag.descendants())
+                    .enter()
+                    .append("g")
+                    .attr("class", "node")
+                    .attr("transform", d => {
+                        const p = pos.get(d.data.id);
+                        return `translate(${p.x},${p.y})`;
+                    })
+                    .call(d3.drag()
+                        .on("start", () => d3.select(document.body).style("cursor", "grabbing"))
+                        .on("end", () => d3.select(document.body).style("cursor", "default"))
+                        .on("drag", function (event, d) {
+                            const newX = event.x;
+                            const newY = event.y;
+                            pos.set(d.data.id, { x: newX, y: newY });
+                            d3.select(this).attr("transform", `translate(${newX},${newY})`);
+                            updateLinks();
+                        }));
+
+                node.append("rect")
+                    .attr("x", -40)
+                    .attr("y", -20)
+                    .attr("width", 80)
+                    .attr("height", 40);
+
+                node.append("text")
+                    .text(d => d.data.id)
+                    .attr("text-anchor", "middle")
+                    .attr("alignment-baseline", "middle");
+
+                node.append("title")
+                    .text(d => `Node: ${d.data.id}`);
+
+                // Update link positions
+                function updateLinks() {
+                    linkLines
+                        .attr("x1", d => pos.get(d.source.data.id).x)
+                        .attr("y1", d => pos.get(d.source.data.id).y)
+                        .attr("x2", d => pos.get(d.target.data.id).x)
+                        .attr("y2", d => pos.get(d.target.data.id).y);
+                }
+
+                updateLinks(); // initial draw
+            });
+
+        // SVG Download
+        function downloadSVG() {
+            const svgEl = document.querySelector("svg");
+
+            // Clone SVG to avoid modifying what's on screen
+            const clone = svgEl.cloneNode(true);
+
+            // Get width and height from viewBox or fallback
+            const viewBox = svgEl.getAttribute("viewBox") || "0 0 1000 800";
+            const [minX, minY, width, height] = viewBox.split(" ").map(Number);
+
+            // Create a white background rect
+            const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            bg.setAttribute("x", minX);
+            bg.setAttribute("y", minY);
+            bg.setAttribute("width", width);
+            bg.setAttribute("height", height);
+            bg.setAttribute("fill", "white");
+
+            // Insert background as first child
+            clone.insertBefore(bg, clone.firstChild);
+
+            // Serialize and download
+            const serializer = new XMLSerializer();
+            const source = serializer.serializeToString(clone);
+            const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "flowpipe_dag.svg";
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+
+</body>
+
+</html>
